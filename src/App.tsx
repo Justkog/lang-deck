@@ -8,6 +8,7 @@ import { SettingsPage } from './features/settings/SettingsPage';
 import { AddCardPage } from './features/flashcards/AddCardPage';
 import { CardsFilterPage } from './features/flashcards/CardsFilterPage';
 import { LearningSessionPage } from './features/study/LearningSessionPage';
+import './App.css';
 
 const router = createBrowserRouter([
   {

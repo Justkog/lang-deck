@@ -10,6 +10,7 @@ import useColorScheme from '../../hooks/useColorScheme';
 
 interface CardWithFlipState extends Card {
   isFlipped: boolean;
+  isRestoring?: boolean;
 }
 
 // Types for the learning session state and actions
@@ -28,7 +29,8 @@ type LearningSessionAction =
   | { type: 'FLIP_CARD'; cardId: string }
   | { type: 'UNDO' }
   | { type: 'SET_ERROR'; error: string }
-  | { type: 'SET_LOADING'; loading: boolean };
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'UPDATE_CARD'; payload: CardWithFlipState };
 
 // Reducer function for handling all learning session state changes
 const learningSessionReducer = (state: LearningSessionState, action: LearningSessionAction): LearningSessionState => {
@@ -91,16 +93,16 @@ const learningSessionReducer = (state: LearningSessionState, action: LearningSes
 
       const lastDiscardedCard = state.discardedCards[state.discardedCards.length - 1];
       const updatedCards = [...state.cards];
-      
+
       const initialCount = Math.min(4, state.initialCards.length);
       if (updatedCards.length >= initialCount) {
         updatedCards.shift();
       }
-      
+
       return {
         ...state,
         discardedCards: state.discardedCards.slice(0, -1),
-        cards: [...updatedCards, { ...lastDiscardedCard, isFlipped: false }],
+        cards: [...updatedCards, { ...lastDiscardedCard, isFlipped: false, isRestoring: true }],
         nextCardIndex: state.nextCardIndex > 0 ? state.nextCardIndex - 1 : 0
       };
     }
@@ -117,6 +119,15 @@ const learningSessionReducer = (state: LearningSessionState, action: LearningSes
       return {
         ...state,
         loading: action.loading
+      };
+    }
+
+    case 'UPDATE_CARD': {
+      return {
+        ...state,
+        cards: state.cards.map(card =>
+          card.id === action.payload.id ? action.payload : card
+        )
       };
     }
 
@@ -227,6 +238,20 @@ export const LearningSessionPage: React.FC = () => {
 
     dispatch({ type: 'FLIP_CARD', cardId });
   }, []);
+
+  // Add this effect after your other useEffects
+  useEffect(() => {
+    const restoringCard = state.cards.find(card => card.isRestoring);
+    if (restoringCard) {
+      const timer = setTimeout(() => {
+        dispatch({
+          type: 'UPDATE_CARD',
+          payload: { ...restoringCard, isRestoring: false }
+        });
+      }, 500); // Match this with animation duration
+      return () => clearTimeout(timer);
+    }
+  }, [state.cards]);
 
   // Common card styles
   const cardStyles = {
@@ -370,18 +395,20 @@ export const LearningSessionPage: React.FC = () => {
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={(e) => handleCardClick(card.id, e)}
-                  className="pressable"
+                  className={`pressable ${card.isRestoring ? 'card-restoring' : ''}`}
                   style={{
                     position: 'absolute',
                     width: '100%',
                     height: '100%',
-                    left: 0,
-                    top: 0,
+                    // left: 0,
+                    // top: 0,
                     touchAction: 'none',
                     cursor: 'pointer',
                     WebkitTapHighlightColor: 'transparent',
-                    transform: `scale(${scale}) translateY(${translateY}px)`,
-                    transition: 'transform 0.2s ease-out'
+                    ...!card.isRestoring && {
+                      transform: `scale(${scale}) translateY(${translateY}px)`,
+                      transition: 'transform 0.2s ease-out'
+                    }
                   }}
                 >
                   <ReactCardFlip
@@ -395,7 +422,10 @@ export const LearningSessionPage: React.FC = () => {
                     {/* Front of card */}
                     <Paper
                       elevation={8}
-                      sx={cardStyles}
+                      sx={{
+                        ...cardStyles,
+                        backgroundColor: colorScheme.learningWordBackground,
+                      }}
                     >
                       <Typography
                         variant="h4"
@@ -427,7 +457,10 @@ export const LearningSessionPage: React.FC = () => {
                     {/* Back of card */}
                     <Paper
                       elevation={8}
-                      sx={cardStyles}
+                      sx={{
+                        ...cardStyles,
+                        backgroundColor: colorScheme.knownWordBackground,
+                      }}
                     >
                       <Typography
                         variant="h4"
