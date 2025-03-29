@@ -8,7 +8,9 @@ import {
   IconButton,
   Paper,
   Autocomplete,
-  Chip
+  Chip,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
@@ -25,6 +27,7 @@ export const CardsFilterPage: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [word, setWord] = useState('');
   const [context, setContext] = useState('');
+  const [performanceFilter, setPerformanceFilter] = useState<'struggling' | 'mastered' | 'all'>('all');
   
   // Load all available tags when component mounts
   useEffect(() => {
@@ -41,6 +44,7 @@ export const CardsFilterPage: React.FC = () => {
       if (currentFilter.tags) setSelectedTags(currentFilter.tags);
       if (currentFilter.word) setWord(currentFilter.word);
       if (currentFilter.context) setContext(currentFilter.context);
+      if (currentFilter.performanceFilter) setPerformanceFilter(currentFilter.performanceFilter);
     };
     
     loadTags();
@@ -50,6 +54,7 @@ export const CardsFilterPage: React.FC = () => {
     setSelectedTags([]);
     setWord('');
     setContext('');
+    setPerformanceFilter('all');
     clearFilter();
     navigate(-1); // Navigate back immediately after clearing
   };
@@ -60,6 +65,7 @@ export const CardsFilterPage: React.FC = () => {
     if (selectedTags.length > 0) filters.tags = selectedTags;
     if (word.trim()) filters.word = word.trim();
     if (context.trim()) filters.context = context.trim();
+    filters.performanceFilter = performanceFilter;
     
     setFilter(filters);
     navigate(-1); // Navigate back immediately after applying
@@ -78,6 +84,34 @@ export const CardsFilterPage: React.FC = () => {
 
       <Paper sx={{ p: 3, borderRadius: 2 }}>
         <Stack spacing={3}>
+          {/* Performance filter */}
+          <Box>
+            <Typography 
+              variant="subtitle2" 
+              color={colorScheme.tagText}
+              sx={{ fontWeight: 600, mb: 1 }}
+            >
+              PERFORMANCE FILTER
+            </Typography>
+            <ToggleButtonGroup
+              value={performanceFilter}
+              exclusive
+              onChange={(_, value) => value && setPerformanceFilter(value)}
+              fullWidth
+              color="primary"
+            >
+              <ToggleButton value="all">
+                All Cards
+              </ToggleButton>
+              <ToggleButton value="struggling">
+                Need Practice
+              </ToggleButton>
+              <ToggleButton value="mastered">
+                Well Learned
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
           {/* Word search field */}
           <TextField
             label="Search words"

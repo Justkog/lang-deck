@@ -12,6 +12,7 @@ export interface Card {
   tags?: string[];        // Optional tags for categorization
   correctCount: number;   // Count of correct guesses
   wrongCount: number;     // Count of wrong guesses
+  revisitCount: number;   // Count of times marked for revision
   createdAt: string;      // ISO timestamp for creation
   updatedAt: string;      // ISO timestamp for last update
 }

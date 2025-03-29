@@ -206,6 +206,7 @@ export const AddCardPage: React.FC = () => {
         tags: tags.length > 0 ? tags : undefined,
         correctCount: isEditMode ? editCard!.correctCount : 0,
         wrongCount: isEditMode ? editCard!.wrongCount : 0,
+        revisitCount: isEditMode ? editCard!.revisitCount : 0,
         createdAt: isEditMode ? editCard!.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

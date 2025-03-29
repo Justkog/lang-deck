@@ -4,6 +4,7 @@ export interface FilterCriteria {
   tags?: string[];
   word?: string;
   context?: string;
+  performanceFilter?: 'struggling' | 'mastered' | 'all';  // New field
 }
 
 // In-memory storage for current filter
@@ -35,6 +36,20 @@ export function clearFilter(): void {
  */
 export function applyFilter(cards: Card[]): Card[] {
   return cards.filter(card => {
+    // Filter by performance
+    if (currentFilter.performanceFilter && currentFilter.performanceFilter !== 'all') {
+      const ratio = card.correctCount === 0 ? 
+        card.wrongCount : // If correctCount is 0, use wrongCount to avoid division by zero
+        card.wrongCount / card.correctCount;
+        
+      if (currentFilter.performanceFilter === 'struggling' && ratio < 1) {
+        return false;
+      }
+      if (currentFilter.performanceFilter === 'mastered' && ratio >= 1) {
+        return false;
+      }
+    }
+
     // Filter by tags
     if (currentFilter.tags?.length) {
       if (!card.tags?.some(tag => currentFilter.tags?.includes(tag))) {

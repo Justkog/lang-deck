@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { Box, Paper, Typography, IconButton, Button } from '@mui/material';
 import { ArrowBack, Undo } from '@mui/icons-material';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import TinderCard from 'react-tinder-card';
 import ReactCardFlip from 'react-card-flip';
 import { Card, getCardsByLanguages, updateCard } from '../../services/cardService';
@@ -11,6 +11,7 @@ import useColorScheme from '../../hooks/useColorScheme';
 interface CardWithFlipState extends Card {
   isFlipped: boolean;
   isRestoring?: boolean;
+  swipeDirection?: 'left' | 'right' | 'down';  // Store the direction the card was swiped
 }
 
 // Types for the learning session state and actions
@@ -136,11 +137,19 @@ const learningSessionReducer = (state: LearningSessionState, action: LearningSes
   }
 };
 
+// Add type for the expected location state
+interface LocationState {
+  cards: Card[];
+  showKnownLanguage: boolean;
+}
+
 export const LearningSessionPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const colorScheme = useColorScheme();
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const [showKnownLanguage, setShowKnownLanguage] = useState(false);
 
   const [state, dispatch] = useReducer(learningSessionReducer, {
     cards: [],
@@ -159,50 +168,89 @@ export const LearningSessionPage: React.FC = () => {
     navigate('/');
   }, [navigate]);
 
-  // Load cards on mount
+  // Initialize cards and showKnownLanguage from location state
   useEffect(() => {
-    const loadCards = async () => {
-      try {
-        dispatch({ type: 'SET_LOADING', loading: true });
-        const settings = await getOrCreateSettings();
-        const loadedCards = await getCardsByLanguages(
-          settings.knownLanguage,
-          settings.learningLanguage
-        );
-        dispatch({ type: 'INITIALIZE_CARDS', payload: loadedCards });
-      } catch (err) {
-        dispatch({ type: 'SET_ERROR', error: 'Failed to load cards. Please try again.' });
-        console.error('Error loading cards:', err);
-      }
+    const { cards: initialCards, showKnownLanguage: initialShowKnown } = (location.state as LocationState) ?? {
+      cards: [],
+      showKnownLanguage: false
     };
 
-    loadCards();
-  }, []);
+    if (!initialCards?.length) {
+      dispatch({ 
+        type: 'SET_ERROR', 
+        error: 'No cards available. Please go back and try different filters.' 
+      });
+      return;
+    }
 
-  const handleSwipe = useCallback(async (cardId: string, direction: string) => {
-    console.debug('Card swiped:', cardId, direction);
+    setShowKnownLanguage(initialShowKnown);
+    dispatch({ type: 'INITIALIZE_CARDS', payload: initialCards });
+  }, [location.state]);
+
+  const handleSwipe = useCallback(async (cardId: string, dir: string) => {
+    // Only handle left, right, and down swipes
+    if (dir !== 'left' && dir !== 'right' && dir !== 'down') return;
+    
+    console.debug('Card swiped:', cardId, dir);
     const card = state.cards.find(c => c.id === cardId);
     if (!card) return;
-    const isCorrect = direction === 'right';
+
+    // Set the swipe direction immediately
+    dispatch({
+      type: 'UPDATE_CARD',
+      payload: { ...card, swipeDirection: dir }
+    });
 
     try {
-      await updateCard({
-        ...card,
-        correctCount: card.correctCount + (isCorrect ? 1 : 0),
-        wrongCount: card.wrongCount + (isCorrect ? 0 : 1)
-      });
+      if (dir === 'down') {
+        await updateCard({
+          ...card,
+          revisitCount: (card.revisitCount || 0) + 1
+        });
+      } else {
+        const isCorrect = dir === 'right';
+        await updateCard({
+          ...card,
+          correctCount: card.correctCount + (isCorrect ? 1 : 0),
+          wrongCount: card.wrongCount + (isCorrect ? 0 : 1)
+        });
+      }
     } catch (err) {
       console.error('Error updating card:', err);
     }
   }, [state.cards]);
 
   const handleCardLeftScreen = useCallback((cardId: string) => {
+    const card = state.cards.find(c => c.id === cardId);
+    if (!card) return;
+    
     dispatch({ type: 'CARD_LEFT_SCREEN', cardId });
-  }, []);
+  }, [state.cards]);
 
-  const handleUndo = useCallback(() => {
-    dispatch({ type: 'UNDO' });
-  }, []);
+  const handleUndo = useCallback(async () => {
+    if (state.discardedCards.length === 0) return;
+    
+    const lastCard = state.discardedCards[state.discardedCards.length - 1];
+    if (!lastCard) return;
+
+    try {
+      // Find the original card state from initialCards
+      const originalCard = state.initialCards.find(c => c.id === lastCard.id);
+      if (!originalCard) return;
+
+      // Revert the card to its original statistics
+      await updateCard({
+        ...lastCard,
+        correctCount: originalCard.correctCount,
+        wrongCount: originalCard.wrongCount,
+        revisitCount: originalCard.revisitCount || 0
+      });
+      
+      dispatch({ type: 'UNDO' });
+    } catch (err) {
+      console.error('Error updating card during undo:', err);
+    }
+  }, [state.discardedCards, state.initialCards]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -294,29 +342,105 @@ export const LearningSessionPage: React.FC = () => {
   }
 
   if (state.cards.length === 0) {
+    const hasCompletedSession = state.initialCards.length > 0;
+    
     return (
       <Box sx={{
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: 2,
-        gap: 2
+        bgcolor: 'background.default'
       }}>
-        <Typography variant="h6" align="center">
-          No cards available for your current language settings
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => navigate('/')}
-          startIcon={<ArrowBack />}
-        >
-          Back to Study
-        </Button>
+        {/* Header */}
+        <Box sx={{
+          p: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <IconButton onClick={handleBackClick} color="primary">
+            <ArrowBack />
+          </IconButton>
+          <IconButton
+            onClick={handleUndo}
+            color="primary"
+            aria-label="undo last card"
+            disabled={state.discardedCards.length === 0}
+          >
+            <Undo />
+          </IconButton>
+        </Box>
+
+        {/* Center content */}
+        <Box sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 2,
+          gap: 2
+        }}>
+          <Typography variant="h6" align="center">
+            {hasCompletedSession 
+              ? "Congratulations! You've completed this learning session" 
+              : "No cards available for your current language settings"}
+          </Typography>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/')}
+            startIcon={<ArrowBack />}
+          >
+            Back to Study
+          </Button>
+        </Box>
       </Box>
     );
   }
+
+  const renderCardContent = (card: CardWithFlipState, isFront: boolean) => {
+    const isKnownLanguage = (isFront && showKnownLanguage) || (!isFront && !showKnownLanguage);
+    const word = isKnownLanguage ? card.known : card.learning;
+    const context = isKnownLanguage ? card.contextKnown?.[0] : card.contextLearning?.[0];
+    const backgroundColor = isKnownLanguage ? colorScheme.knownWordBackground : colorScheme.learningWordBackground;
+    const textColor = isKnownLanguage ? colorScheme.knownWord : colorScheme.learningWord;
+
+    return (
+      <Paper
+        elevation={8}
+        sx={{
+          ...cardStyles,
+          backgroundColor,
+        }}
+      >
+        <Typography
+          variant="h4"
+          component="h2"
+          align="center"
+          sx={{
+            color: textColor,
+            mb: 2,
+            wordBreak: 'break-word'
+          }}
+        >
+          {word}
+        </Typography>
+        {context && (
+          <Typography
+            variant="body1"
+            align="center"
+            sx={{
+              mt: 2,
+              fontStyle: 'italic',
+              color: 'text.secondary'
+            }}
+          >
+            {context}
+          </Typography>
+        )}
+      </Paper>
+    );
+  };
 
   return (
     <Box sx={{
@@ -386,7 +510,7 @@ export const LearningSessionPage: React.FC = () => {
                 key={card.id}
                 onSwipe={(dir) => handleSwipe(card.id, dir)}
                 onCardLeftScreen={() => handleCardLeftScreen(card.id)}
-                preventSwipe={['up', 'down']}
+                preventSwipe={['up']}
                 swipeRequirementType="position"
                 swipeThreshold={100}
               >
@@ -400,8 +524,6 @@ export const LearningSessionPage: React.FC = () => {
                     position: 'absolute',
                     width: '100%',
                     height: '100%',
-                    // left: 0,
-                    // top: 0,
                     touchAction: 'none',
                     cursor: 'pointer',
                     WebkitTapHighlightColor: 'transparent',
@@ -419,75 +541,8 @@ export const LearningSessionPage: React.FC = () => {
                       back: { WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }
                     }}
                   >
-                    {/* Front of card */}
-                    <Paper
-                      elevation={8}
-                      sx={{
-                        ...cardStyles,
-                        backgroundColor: colorScheme.learningWordBackground,
-                      }}
-                    >
-                      <Typography
-                        variant="h4"
-                        component="h2"
-                        align="center"
-                        sx={{
-                          color: colorScheme.learningWord,
-                          mb: 2,
-                          wordBreak: 'break-word'
-                        }}
-                      >
-                        {card.learning}
-                      </Typography>
-                      {card.contextLearning?.[0] && (
-                        <Typography
-                          variant="body1"
-                          align="center"
-                          sx={{
-                            mt: 2,
-                            fontStyle: 'italic',
-                            color: 'text.secondary'
-                          }}
-                        >
-                          {card.contextLearning[0]}
-                        </Typography>
-                      )}
-                    </Paper>
-
-                    {/* Back of card */}
-                    <Paper
-                      elevation={8}
-                      sx={{
-                        ...cardStyles,
-                        backgroundColor: colorScheme.knownWordBackground,
-                      }}
-                    >
-                      <Typography
-                        variant="h4"
-                        component="h2"
-                        align="center"
-                        sx={{
-                          color: colorScheme.knownWord,
-                          mb: 2,
-                          wordBreak: 'break-word'
-                        }}
-                      >
-                        {card.known}
-                      </Typography>
-                      {card.contextKnown?.[0] && (
-                        <Typography
-                          variant="body1"
-                          align="center"
-                          sx={{
-                            mt: 2,
-                            fontStyle: 'italic',
-                            color: 'text.secondary'
-                          }}
-                        >
-                          {card.contextKnown[0]}
-                        </Typography>
-                      )}
-                    </Paper>
+                    {renderCardContent(card, true)}
+                    {renderCardContent(card, false)}
                   </ReactCardFlip>
                 </div>
               </TinderCard>
@@ -499,16 +554,22 @@ export const LearningSessionPage: React.FC = () => {
       {/* Instructions */}
       <Box sx={{
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems: 'center',
         marginBottom: 2,
-        gap: 4,
+        gap: 1,
         px: 2
       }}>
-        <Typography variant="body2" color="error">
-          ← Swipe left if incorrect
-        </Typography>
-        <Typography variant="body2" color="success.main">
-          Swipe right if correct →
+        <Box sx={{ display: 'flex', gap: 4, mb: 1 }}>
+          <Typography variant="body2" color="error">
+            ← Swipe left if incorrect
+          </Typography>
+          <Typography variant="body2" color="success.main">
+            Swipe right if correct →
+          </Typography>
+        </Box>
+        <Typography variant="body2" color="info.main">
+          ↓ Swipe down to mark for revision
         </Typography>
       </Box>
     </Box>
