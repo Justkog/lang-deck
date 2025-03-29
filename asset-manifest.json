@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/lang-deck/static/css/main.01492021.css",
-    "main.js": "/lang-deck/static/js/main.53462ba0.js",
+    "main.js": "/lang-deck/static/js/main.0f3c540f.js",
     "static/js/453.19da680b.chunk.js": "/lang-deck/static/js/453.19da680b.chunk.js",
     "service-worker.js": "/lang-deck/service-worker.js",
     "index.html": "/lang-deck/index.html",
     "main.01492021.css.map": "/lang-deck/static/css/main.01492021.css.map",
-    "main.53462ba0.js.map": "/lang-deck/static/js/main.53462ba0.js.map",
+    "main.0f3c540f.js.map": "/lang-deck/static/js/main.0f3c540f.js.map",
     "453.19da680b.chunk.js.map": "/lang-deck/static/js/453.19da680b.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.01492021.css",
-    "static/js/main.53462ba0.js"
+    "static/js/main.0f3c540f.js"
   ]
 }
