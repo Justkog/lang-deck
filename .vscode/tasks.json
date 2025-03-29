@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "start-react",
+        "type": "npm",
+        "script": "start",
+        "isBackground": true,
+        "problemMatcher": {
+          "owner": "custom",
+          "pattern": {
+            "regexp": "."
+          },
+          "background": {
+            "beginsPattern": "Starting the development server",
+            "endsPattern": "Compiled successfully|Failed to compile"
+          }
+        }
+      }
+    ]
+  }
