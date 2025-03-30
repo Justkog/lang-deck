@@ -10,7 +10,6 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  useTheme,
   IconButton,
   Dialog,
   DialogTitle,
@@ -21,21 +20,21 @@ import {
 } from '@mui/material';
 import { Add, Delete, Edit, FilterList } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
-import { getCards, Card as FlashCard, deleteCard } from '../../services/cardService';
+import { getCards, IFlashCard as IFlashCard, deleteCard } from '../../services/cardService';
 import { getOrCreateSettings, Settings } from '../../services/settingsService';
-import { getFilter, applyFilter } from '../../services/flashcardsFilterService';
+import { useFilter } from '../../context/FilterContext';
 import useColorScheme from '../../hooks/useColorScheme';
 
 export const ListPage: React.FC = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
   const colorScheme = useColorScheme();
-  const [cards, setCards] = useState<FlashCard[]>([]);
-  const [filteredCards, setFilteredCards] = useState<FlashCard[]>([]);
+  const { currentFilter, applyFilter } = useFilter();
+  const [cards, setCards] = useState<IFlashCard[]>([]);
+  const [filteredCards, setFilteredCards] = useState<IFlashCard[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cardToDelete, setCardToDelete] = useState<FlashCard | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<IFlashCard | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Load settings and cards when component mounts
@@ -60,8 +59,7 @@ export const ListPage: React.FC = () => {
         );
         
         // Apply user filters
-        const userFiltered = applyFilter(languageFiltered);
-        setFilteredCards(userFiltered);
+        setFilteredCards(applyFilter(languageFiltered));
         setError(null);
       } catch (err) {
         console.error('Error loading data:', err);
@@ -72,13 +70,13 @@ export const ListPage: React.FC = () => {
     };
     
     loadData();
-  }, []);
+  }, [currentFilter]);
 
   const handleAddClick = () => {
     navigate('/add');
   };
 
-  const handleDeleteClick = (card: FlashCard) => {
+  const handleDeleteClick = (card: IFlashCard) => {
     setCardToDelete(card);
     setDeleteError(null);
   };
@@ -102,7 +100,7 @@ export const ListPage: React.FC = () => {
     setDeleteError(null);
   };
 
-  const handleEditClick = (card: FlashCard) => {
+  const handleEditClick = (card: IFlashCard) => {
     navigate('/add', { 
       state: { 
         mode: 'edit',
@@ -158,7 +156,7 @@ export const ListPage: React.FC = () => {
           <Badge 
             color="primary" 
             variant="dot" 
-            invisible={!Object.keys(getFilter()).length}
+            invisible={!Object.keys(currentFilter).length}
           >
             <FilterList />
           </Badge>
@@ -233,7 +231,7 @@ export const ListPage: React.FC = () => {
               variant="outlined" 
               sx={{ 
                 borderRadius: 2,
-                borderColor: theme.palette.divider,
+                borderColor: 'divider',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                 transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
                 '&:hover': {
@@ -351,8 +349,8 @@ export const ListPage: React.FC = () => {
                           fontWeight: 500,
                           fontSize: '0.75rem',
                           '&:hover': {
-                            bgcolor: theme.palette.primary.light,
-                            color: theme.palette.primary.contrastText
+                            bgcolor: 'primary.light',
+                            color: 'primary.contrastText'
                           }
                         }}
                       />
@@ -390,6 +388,7 @@ export const ListPage: React.FC = () => {
                   <Box 
                     component="span"
                     sx={{ 
+                      mr: 2,
                       display: 'flex',
                       alignItems: 'center',
                       '&::before': {
@@ -404,6 +403,24 @@ export const ListPage: React.FC = () => {
                     }}
                   >
                     Wrong: {card.wrongCount}
+                  </Box>
+                  <Box 
+                    component="span"
+                    sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      '&::before': {
+                        content: '""',
+                        display: 'inline-block',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        bgcolor: 'info.main',
+                        mr: 0.5
+                      }
+                    }}
+                  >
+                    Revisit: {card.revisitCount || 0}
                   </Box>
                 </Box>
               </CardContent>

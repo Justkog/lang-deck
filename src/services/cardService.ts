@@ -1,7 +1,7 @@
 import Dexie, { Table } from 'dexie';
 
-// Card data model
-export interface Card {
+// Card data models
+export interface IFlashCard {
   id: string;             // Unique identifier (e.g., UUID)
   known: string;          // Word/expression in the known language
   learning: string;       // Word/expression in the language to learn
@@ -17,10 +17,17 @@ export interface Card {
   updatedAt: string;      // ISO timestamp for last update
 }
 
+// Type for new flashcards before they're added to the database
+export type INewFlashCard = Pick<IFlashCard, 'id' | 'known' | 'learning' | 'knownLanguage' | 'learningLanguage'> & {
+  contextKnown?: string[];
+  contextLearning?: string[];
+  tags?: string[];
+}
+
 // Define the database
 class CardDatabase extends Dexie {
   // Define tables
-  cards!: Table<Card, string>; // string is the type of the primary key
+  cards!: Table<IFlashCard, string>; // string is the type of the primary key
 
   constructor() {
     super('langDeckDatabase');
@@ -40,12 +47,34 @@ class CardDatabase extends Dexie {
 // Create a database instance
 const db = new CardDatabase();
 
+async function bulkPutNewOnly<T extends { id: string }, P extends Partial<IFlashCard>>(
+  table: Table<T & P, string>,
+  items: T[],
+  propertiesToSetIfNew: P
+): Promise<void> {
+  const existingIds = new Set(await table.where(':id').anyOf(items.map(item => item.id)).primaryKeys());
+  const newItems = items.filter(item => !existingIds.has(item.id)).map(newItem => ({
+    ...newItem,
+    ...propertiesToSetIfNew
+  }));
+  const existingItemsToUpdate = items.filter(item => existingIds.has(item.id)) as (T & P)[];
+
+  await db.transaction('rw', table, async () => {
+    if (newItems.length > 0) {
+      await table.bulkAdd(newItems);
+    }
+    if (existingItemsToUpdate.length > 0) {
+      await table.bulkPut(existingItemsToUpdate);
+    }
+  });
+}
+
 /**
  * Adds a new card to the database
  * @param card The card to add
  * @returns A promise that resolves when the operation is complete
  */
-export async function addCard(card: Card): Promise<void> {
+export async function addCard(card: IFlashCard): Promise<void> {
   try {
     await db.cards.add(card);
   } catch (error) {
@@ -54,11 +83,34 @@ export async function addCard(card: Card): Promise<void> {
   }
 }
 
+// --- Optional Helper for Bulk Add ---
+// Dexie's bulkAdd is straightforward, but a helper can encapsulate logic
+export async function addMultipleFlashcardsToDB(flashcards: INewFlashCard[]): Promise<void> {
+  if (!flashcards || flashcards.length === 0) {
+    console.log("No flashcards provided to add.");
+    return;
+  }
+  try {
+    const timestamp = new Date().toISOString();
+    await bulkPutNewOnly(db.cards, flashcards, {
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      correctCount: 0,
+      wrongCount: 0,
+      revisitCount: 0
+    });
+    console.log(`Successfully processed ${flashcards.length} flashcards.`);
+  } catch (error) {
+    console.error("Failed to process flashcards:", error);
+    throw new Error(`Failed to add flashcards: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /**
  * Retrieves all cards from the database
  * @returns A promise that resolves with an array of cards
  */
-export async function getCards(): Promise<Card[]> {
+export async function getCards(): Promise<IFlashCard[]> {
   try {
     return await db.cards.toArray();
   } catch (error) {
@@ -72,7 +124,7 @@ export async function getCards(): Promise<Card[]> {
  * @param card The card with updated values
  * @returns A promise that resolves when the operation is complete
  */
-export async function updateCard(card: Card): Promise<void> {
+export async function updateCard(card: IFlashCard): Promise<void> {
   try {
     // Make sure to update the updatedAt timestamp
     const updatedCard = {
@@ -106,7 +158,7 @@ export async function deleteCard(id: string): Promise<void> {
  * @param tags The tags to filter by
  * @returns A promise that resolves with an array of filtered cards
  */
-export async function getCardsByTags(tags: string[]): Promise<Card[]> {
+export async function getCardsByTags(tags: string[]): Promise<IFlashCard[]> {
   try {
     if (!tags.length) {
       return getCards();
@@ -141,7 +193,7 @@ export function generateId(): string {
  * @param descending Whether to sort in descending order (most wrong answers first)
  * @returns A promise that resolves with an array of sorted cards
  */
-export async function getCardsByPerformance(descending: boolean = true): Promise<Card[]> {
+export async function getCardsByPerformance(descending: boolean = true): Promise<IFlashCard[]> {
   try {
     const cards = await getCards();
     
@@ -163,7 +215,7 @@ export async function getCardsByPerformance(descending: boolean = true): Promise
  * @param learningLanguage The learning language to filter by
  * @returns A promise that resolves with an array of filtered cards
  */
-export async function getCardsByLanguages(knownLanguage: string, learningLanguage: string): Promise<Card[]> {
+export async function getCardsByLanguages(knownLanguage: string, learningLanguage: string): Promise<IFlashCard[]> {
   try {
     return await db.cards
       .where('knownLanguage')

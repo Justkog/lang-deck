@@ -21,13 +21,13 @@ import {
 } from '@mui/material';
 import { Add, Delete, ArrowBack, Save, Close } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router';
-import { addCard, updateCard, generateId, Card } from '../../services/cardService';
+import { addCard, updateCard, generateId, IFlashCard } from '../../services/cardService';
 import { getOrCreateSettings, Settings } from '../../services/settingsService';
 import useColorScheme from '../../hooks/useColorScheme';
 
 interface LocationState {
   mode?: 'edit' | 'create';
-  card?: Card;
+  card?: IFlashCard;
 }
 
 // TypeScript interfaces for our form data
@@ -195,7 +195,7 @@ export const AddCardPage: React.FC = () => {
     try {
       setIsSubmitting(true);
       
-      const cardData: Card = {
+      const cardData: IFlashCard = {
         id: isEditMode ? editCard!.id : generateId(),
         known: knownLanguageWord.trim(),
         learning: learningLanguageWord.trim(),

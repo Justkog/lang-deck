@@ -15,19 +15,22 @@ import {
 import { ArrowBack } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
 import { getCards } from '../../services/cardService';
-import { setFilter, getFilter, clearFilter, FilterCriteria } from '../../services/flashcardsFilterService';
+import { useFilter } from '../../context/FilterContext';
 import useColorScheme from '../../hooks/useColorScheme';
 
 export const CardsFilterPage: React.FC = () => {
   const navigate = useNavigate();
   const colorScheme = useColorScheme();
+  const { currentFilter, setFilter, clearFilter } = useFilter();
   
   // Filter state
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [word, setWord] = useState('');
-  const [context, setContext] = useState('');
-  const [performanceFilter, setPerformanceFilter] = useState<'struggling' | 'mastered' | 'all'>('all');
+  const [selectedTags, setSelectedTags] = useState<string[]>(currentFilter.tags || []);
+  const [word, setWord] = useState(currentFilter.word || '');
+  const [context, setContext] = useState(currentFilter.context || '');
+  const [performanceFilter, setPerformanceFilter] = useState<'struggling' | 'mastered' | 'all'>(
+    currentFilter.performanceFilter || 'all'
+  );
   
   // Load all available tags when component mounts
   useEffect(() => {
@@ -38,13 +41,6 @@ export const CardsFilterPage: React.FC = () => {
         card.tags?.forEach(tag => allTags.add(tag));
       });
       setAvailableTags(Array.from(allTags));
-      
-      // Load current filter if exists
-      const currentFilter = getFilter();
-      if (currentFilter.tags) setSelectedTags(currentFilter.tags);
-      if (currentFilter.word) setWord(currentFilter.word);
-      if (currentFilter.context) setContext(currentFilter.context);
-      if (currentFilter.performanceFilter) setPerformanceFilter(currentFilter.performanceFilter);
     };
     
     loadTags();
@@ -56,19 +52,17 @@ export const CardsFilterPage: React.FC = () => {
     setContext('');
     setPerformanceFilter('all');
     clearFilter();
-    navigate(-1); // Navigate back immediately after clearing
+    navigate(-1);
   };
 
   const handleApplyFilters = () => {
-    const filters: FilterCriteria = {};
-    
-    if (selectedTags.length > 0) filters.tags = selectedTags;
-    if (word.trim()) filters.word = word.trim();
-    if (context.trim()) filters.context = context.trim();
-    filters.performanceFilter = performanceFilter;
-    
-    setFilter(filters);
-    navigate(-1); // Navigate back immediately after applying
+    setFilter({
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
+      word: word.trim() || undefined,
+      context: context.trim() || undefined,
+      performanceFilter
+    });
+    navigate(-1);
   };
 
   return (

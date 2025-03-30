@@ -4,11 +4,11 @@ import { ArrowBack, Undo } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router';
 import TinderCard from 'react-tinder-card';
 import ReactCardFlip from 'react-card-flip';
-import { Card, getCardsByLanguages, updateCard } from '../../services/cardService';
+import { IFlashCard, getCardsByLanguages, updateCard } from '../../services/cardService';
 import { getOrCreateSettings } from '../../services/settingsService';
 import useColorScheme from '../../hooks/useColorScheme';
 
-interface CardWithFlipState extends Card {
+interface CardWithFlipState extends IFlashCard {
   isFlipped: boolean;
   isRestoring?: boolean;
   swipeDirection?: 'left' | 'right' | 'down';  // Store the direction the card was swiped
@@ -25,7 +25,7 @@ interface LearningSessionState {
 }
 
 type LearningSessionAction =
-  | { type: 'INITIALIZE_CARDS'; payload: Card[] }
+  | { type: 'INITIALIZE_CARDS'; payload: IFlashCard[] }
   | { type: 'CARD_LEFT_SCREEN'; cardId: string }
   | { type: 'FLIP_CARD'; cardId: string }
   | { type: 'UNDO' }
@@ -139,7 +139,7 @@ const learningSessionReducer = (state: LearningSessionState, action: LearningSes
 
 // Add type for the expected location state
 interface LocationState {
-  cards: Card[];
+  cards: IFlashCard[];
   showKnownLanguage: boolean;
 }
 

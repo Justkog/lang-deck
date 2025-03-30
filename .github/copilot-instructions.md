@@ -117,7 +117,7 @@ src/
   - Cache the app shell and assets for offline usage.
 
 - **Routing:**  
-  - Implement route definitions with React Router.
+  - Implement route definitions with React Router v7 (imported from 'react-router').
   - Consider modal-based navigation for flows like adding a flashcard.
 
 - **Extensibility:**  

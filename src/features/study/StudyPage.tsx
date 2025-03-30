@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Typography, 
@@ -11,13 +11,14 @@ import {
   TextField,
   Chip,
   Stack,
-  Grid,
-  styled
+  styled,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import { Add, PlayArrow } from '@mui/icons-material';
 import { useNavigate } from 'react-router';
-import { Card, getCards } from '../../services/cardService';
-import { setFilter, applyFilter } from '../../services/flashcardsFilterService';
+import { IFlashCard, getCards } from '../../services/cardService';
+import { useFilter } from '../../context/FilterContext';
 import useColorScheme from '../../hooks/useColorScheme';
 import { getOrCreateSettings, Settings } from '../../services/settingsService';
 
@@ -41,13 +42,18 @@ const CustomSwitch = styled(Switch)(({ theme }) => ({
 export const StudyPage: React.FC = () => {
   const navigate = useNavigate();
   const colorScheme = useColorScheme();
+  const { currentFilter, setFilter, applyFilter } = useFilter();
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>(currentFilter.tags || []);
+  const [performanceFilter, setPerformanceFilter] = useState<'struggling' | 'mastered' | 'all'>(
+    currentFilter.performanceFilter || 'all'
+  );
   const [showKnownLanguage, setShowKnownLanguage] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [cards, setCards] = useState<Card[]>([]);
+  const [cards, setCards] = useState<IFlashCard[]>([]);
+  const [filteredCards, setFilteredCards] = useState<IFlashCard[]>([]);
 
-  // Load settings and tags when component mounts
+  // Load settings and cards when component mounts
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -56,7 +62,6 @@ export const StudyPage: React.FC = () => {
           getOrCreateSettings()
         ]);
         
-        // Filter cards based on language settings
         const languageFilteredCards = allCards.filter(
           card => 
             card.knownLanguage === userSettings.knownLanguage && 
@@ -79,22 +84,25 @@ export const StudyPage: React.FC = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    console.debug('Updating filter with selected tags:', selectedTags);
+    setFilter({ 
+      tags: selectedTags,
+      performanceFilter 
+    });
+  }, [selectedTags, performanceFilter, setFilter]);
+
+  useEffect(() => {
+    if (cards.length > 0) {
+      setFilteredCards(applyFilter(cards));
+    }
+  }, [cards, currentFilter]);
+
   const handleAddClick = () => {
     navigate('/add');
   };
 
-  const handleStartSession = () => {
-    // First set the filter criteria
-    if (selectedTags.length > 0) {
-      setFilter({ tags: selectedTags });
-    }
-    
-    // Then apply filter to get final card set
-    const filteredCards = selectedTags.length > 0 
-      ? applyFilter(cards)
-      : cards;
-    
-    // Navigate with the filtered cards and display settings
+  const handleStartSession = useCallback(() => {
     navigate('/learning-session', {
       state: { 
         cards: filteredCards,
@@ -102,7 +110,7 @@ export const StudyPage: React.FC = () => {
       },
       replace: true
     });
-  };
+  }, [filteredCards, showKnownLanguage, navigate]);
 
   return (
     <Box sx={{ 
@@ -130,6 +138,34 @@ export const StudyPage: React.FC = () => {
         }}
       >
         <Stack spacing={3}>
+          <Box>
+            <Typography 
+              variant="subtitle2" 
+              color={colorScheme.tagText}
+              sx={{ fontWeight: 600, mb: 1 }}
+            >
+              PERFORMANCE FILTER
+            </Typography>
+            <ToggleButtonGroup
+              value={performanceFilter}
+              exclusive
+              onChange={(_, value) => value && setPerformanceFilter(value)}
+              fullWidth
+              color="primary"
+              size="small"
+            >
+              <ToggleButton value="all">
+                All
+              </ToggleButton>
+              <ToggleButton value="struggling">
+                Need Practice
+              </ToggleButton>
+              <ToggleButton value="mastered">
+                Well Learned
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
           <Box>
             <Typography 
               variant="subtitle2" 
@@ -200,6 +236,45 @@ export const StudyPage: React.FC = () => {
               }}
             >
               {settings?.knownLanguage || ''}
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+              p: 3,
+              borderRadius: 4,
+              background: theme => `linear-gradient(145deg, ${theme.palette.primary.main}15, ${theme.palette.primary.main}25)`,
+              border: theme => `1px solid ${theme.palette.primary.main}30`,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            <Typography
+              variant="h2"
+              align="center"
+              color="primary"
+              sx={{
+                fontWeight: 700,
+                fontSize: '3rem',
+                textShadow: theme => `2px 2px 4px ${theme.palette.primary.main}25`,
+              }}
+            >
+              {filteredCards.length}
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              align="center"
+              color="text.secondary"
+              sx={{
+                fontWeight: 500,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+              }}
+            >
+              {filteredCards.length === 1 ? 'Card' : 'Cards'}
             </Typography>
           </Box>
         </Stack>
