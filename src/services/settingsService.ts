@@ -26,8 +26,8 @@ const db = new SettingsDatabase();
 
 // Default settings
 const DEFAULT_SETTINGS: Settings = {
-  knownLanguage: 'French',
-  learningLanguage: 'English'
+  knownLanguage: 'Français',
+  learningLanguage: 'Anglais'
 };
 
 /**

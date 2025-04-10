@@ -16,7 +16,7 @@ export const TabsRouter: React.FC = () => {
       <div style={{ paddingBottom: '56px' }}>
         <Outlet />
       </div>
-      <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0 }} elevation={3}>
+      <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10 }} elevation={3}>
         <BottomNavigation value={location.pathname} onChange={handleChange}>
           <BottomNavigationAction
             label="Study"

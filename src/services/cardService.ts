@@ -227,3 +227,44 @@ export async function getCardsByLanguages(knownLanguage: string, learningLanguag
     throw new Error(`Failed to get cards by languages: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+/**
+ * Updates the language name for all cards matching the specified source language
+ * @param sourceLanguage The language name to convert from
+ * @param targetLanguage The language name to convert to
+ * @param fieldType Whether to update 'knownLanguage' or 'learningLanguage'
+ * @returns A promise that resolves with the number of updated cards
+ */
+export async function convertLanguage(
+  sourceLanguage: string, 
+  targetLanguage: string, 
+  fieldType: 'knownLanguage' | 'learningLanguage'
+): Promise<number> {
+  try {
+    const cardsToUpdate = await db.cards
+      .where(fieldType)
+      .equals(sourceLanguage)
+      .toArray();
+    
+    if (cardsToUpdate.length === 0) {
+      return 0;
+    }
+    
+    const updatedCards = cardsToUpdate.map(card => ({
+      ...card,
+      [fieldType]: targetLanguage,
+      updatedAt: new Date().toISOString()
+    }));
+    
+    await db.transaction('rw', db.cards, async () => {
+      for (const card of updatedCards) {
+        await db.cards.update(card.id, card);
+      }
+    });
+    
+    return cardsToUpdate.length;
+  } catch (error) {
+    console.error('Error converting language:', error);
+    throw new Error(`Failed to convert language: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
