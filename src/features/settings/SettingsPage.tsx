@@ -18,7 +18,7 @@ import {
 import papa from 'papaparse';
 import { saveSettings, getOrCreateSettings } from '../../services/settingsService';
 import { ICsvFlashcardImportRow } from '../../types/csvImport';
-import { getCards, IFlashCard, convertLanguage } from '../../services/cardService';
+import { getCards, IFlashCard } from '../../services/cardService';
 
 // Limited list of available languages
 const LANGUAGES = [
@@ -33,39 +33,10 @@ export const SettingsPage: React.FC = () => {
   const [knownLanguage, setKnownLanguage] = useState('');
   const [learningLanguage, setLearningLanguage] = useState('');
   
-  // State for language conversion
-  const [sourceLanguage, setSourceLanguage] = useState('');
-  const [targetLanguage, setTargetLanguage] = useState('');
-  const [conversionType, setConversionType] = useState<'knownLanguage' | 'learningLanguage'>('knownLanguage');
-  const [existingLanguages, setExistingLanguages] = useState<string[]>([]);
-  const [isConverting, setIsConverting] = useState(false);
-  
   // Snackbar state
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
-  
-  // Load existing languages from cards
-  useEffect(() => {
-    const loadExistingLanguages = async () => {
-      try {
-        const cards = await getCards();
-        const knownLangs = new Set(cards.map(card => card.knownLanguage));
-        const learningLangs = new Set(cards.map(card => card.learningLanguage));
-        const allLangs = [...new Set([...knownLangs, ...learningLangs])].sort();
-        setExistingLanguages(allLangs);
-        
-        // Set initial source language if available
-        if (allLangs.length > 0 && sourceLanguage === '') {
-          setSourceLanguage(allLangs[0]);
-        }
-      } catch (error) {
-        console.error('Failed to load existing languages:', error);
-      }
-    };
-    
-    loadExistingLanguages();
-  }, [sourceLanguage]);
   
   // Load settings on component mount
   useEffect(() => {
@@ -92,21 +63,6 @@ export const SettingsPage: React.FC = () => {
     setLearningLanguage(event.target.value);
   };
   
-  // Handle source language selection for conversion
-  const handleSourceLanguageChange = (event: SelectChangeEvent) => {
-    setSourceLanguage(event.target.value);
-  };
-  
-  // Handle target language selection for conversion
-  const handleTargetLanguageChange = (event: SelectChangeEvent) => {
-    setTargetLanguage(event.target.value);
-  };
-  
-  // Handle conversion type selection
-  const handleConversionTypeChange = (event: SelectChangeEvent) => {
-    setConversionType(event.target.value as 'knownLanguage' | 'learningLanguage');
-  };
-  
   // Close snackbar
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
@@ -129,51 +85,6 @@ export const SettingsPage: React.FC = () => {
       setSnackbarMessage('Failed to save settings');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
-    }
-  };
-  
-  // Execute language conversion
-  const handleConvertLanguage = async () => {
-    if (!sourceLanguage || !targetLanguage) {
-      setSnackbarMessage('Please select both source and target languages');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-      return;
-    }
-    
-    if (sourceLanguage === targetLanguage) {
-      setSnackbarMessage('Source and target languages must be different');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-      return;
-    }
-    
-    try {
-      setIsConverting(true);
-      const updatedCount = await convertLanguage(sourceLanguage, targetLanguage, conversionType);
-      
-      setSnackbarMessage(`Successfully converted ${updatedCount} cards from "${sourceLanguage}" to "${targetLanguage}"`);
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
-      
-      // Refresh the existing languages list
-      const cards = await getCards();
-      const knownLangs = new Set(cards.map(card => card.knownLanguage));
-      const learningLangs = new Set(cards.map(card => card.learningLanguage));
-      const allLangs = [...new Set([...knownLangs, ...learningLangs])].sort();
-      setExistingLanguages(allLangs);
-      
-      // Reset source language if it no longer exists
-      if (!allLangs.includes(sourceLanguage)) {
-        setSourceLanguage(allLangs.length > 0 ? allLangs[0] : '');
-      }
-    } catch (error) {
-      console.error('Failed to convert language:', error);
-      setSnackbarMessage('Failed to convert language');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
-    } finally {
-      setIsConverting(false);
     }
   };
   
@@ -411,91 +322,34 @@ export const SettingsPage: React.FC = () => {
           >
             Download CSV Template
           </Button>
+
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/duplicates')}
+            fullWidth
+          >
+            Manage Duplicate Cards
+          </Button>
         </Stack>
       </Box>
 
-      {/* Language Conversion Section */}
+      {/* Language Conversion Link */}
       <Divider sx={{ my: 4 }} />
       <Box sx={{ mb: 4 }}>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Language Conversion
         </Typography>
-        <Typography variant="body2" sx={{ mb: 3 }}>
-          Convert languages in your existing flashcards to standardize language names.
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          Convert and standardize language names in your flashcards.
         </Typography>
-        
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel id="conversion-type-label">Convert in Field</InputLabel>
-          <Select
-            labelId="conversion-type-label"
-            id="conversion-type"
-            value={conversionType}
-            label="Convert in Field"
-            onChange={handleConversionTypeChange}
-          >
-            <MenuItem value="knownLanguage">Known Language</MenuItem>
-            <MenuItem value="learningLanguage">Learning Language</MenuItem>
-          </Select>
-          <FormHelperText>
-            Select which language field to update in your cards
-          </FormHelperText>
-        </FormControl>
-        
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel id="source-language-label">Source Language</InputLabel>
-          <Select
-            labelId="source-language-label"
-            id="source-language"
-            value={sourceLanguage}
-            label="Source Language"
-            onChange={handleSourceLanguageChange}
-          >
-            {existingLanguages.map(language => (
-              <MenuItem 
-                key={language} 
-                value={language}
-                disabled={language === targetLanguage}
-              >
-                {language}
-              </MenuItem>
-            ))}
-          </Select>
-          <FormHelperText>
-            Select the language name to convert from
-          </FormHelperText>
-        </FormControl>
-        
-        <FormControl fullWidth sx={{ mb: 3 }}>
-          <InputLabel id="target-language-label">Target Language</InputLabel>
-          <Select
-            labelId="target-language-label"
-            id="target-language"
-            value={targetLanguage}
-            label="Target Language"
-            onChange={handleTargetLanguageChange}
-          >
-            {LANGUAGES.map(language => (
-              <MenuItem 
-                key={language} 
-                value={language}
-                disabled={language === sourceLanguage}
-              >
-                {language}
-              </MenuItem>
-            ))}
-          </Select>
-          <FormHelperText>
-            Select the standardized language name to convert to
-          </FormHelperText>
-        </FormControl>
-        
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={handleConvertLanguage}
-          disabled={!sourceLanguage || !targetLanguage || sourceLanguage === targetLanguage || isConverting}
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={() => navigate('/language-conversion')}
+          fullWidth
         >
-          Convert Language
+          Go to Language Conversion
         </Button>
       </Box>
 

@@ -268,3 +268,48 @@ export async function convertLanguage(
     throw new Error(`Failed to convert language: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+/**
+ * Merges multiple cards into one, keeping the first card and deleting others
+ * @param cards Array of cards to merge (first card will be kept)
+ * @returns A promise that resolves when the operation is complete
+ */
+export async function mergeCards(cards: IFlashCard[]): Promise<void> {
+  if (cards.length < 2) return;
+
+  const [baseCard, ...cardsToDelete] = cards;
+  
+  // Merge unique context and tags using Sets
+  const mergedContextKnown = Array.from(new Set([
+    ...(baseCard.contextKnown || []),
+    ...cardsToDelete.flatMap(card => card.contextKnown || [])
+  ]));
+  
+  const mergedContextLearning = Array.from(new Set([
+    ...(baseCard.contextLearning || []),
+    ...cardsToDelete.flatMap(card => card.contextLearning || [])
+  ]));
+  
+  const mergedTags = Array.from(new Set([
+    ...(baseCard.tags || []),
+    ...cardsToDelete.flatMap(card => card.tags || [])
+  ]));
+
+  // Sum up the counts
+  const mergedCard: IFlashCard = {
+    ...baseCard,
+    contextKnown: mergedContextKnown,
+    contextLearning: mergedContextLearning,
+    tags: mergedTags,
+    correctCount: cards.reduce((sum, card) => sum + card.correctCount, 0),
+    wrongCount: cards.reduce((sum, card) => sum + card.wrongCount, 0),
+    revisitCount: cards.reduce((sum, card) => sum + card.revisitCount, 0),
+    updatedAt: new Date().toISOString()
+  };
+
+  // Use a transaction to ensure all operations complete or none do
+  await db.transaction('rw', db.cards, async () => {
+    await db.cards.put(mergedCard);
+    await db.cards.bulkDelete(cardsToDelete.map(card => card.id));
+  });
+}

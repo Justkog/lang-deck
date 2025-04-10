@@ -10,6 +10,8 @@ import { AddCardPage } from './features/flashcards/AddCardPage';
 import { CardsFilterPage } from './features/flashcards/CardsFilterPage';
 import { LearningSessionPage } from './features/study/LearningSessionPage';
 import FlashcardImporter from './features/settings/FlashcardImporter';
+import { LanguageConversionPage } from './features/settings/LanguageConversionPage';
+import { DuplicatesPage } from './features/settings/DuplicatesPage';
 import './App.css';
 
 const router = createBrowserRouter(
@@ -47,6 +49,14 @@ const router = createBrowserRouter(
     {
       path: '/import-csv',
       element: <FlashcardImporter />,
+    },
+    {
+      path: '/language-conversion',
+      element: <LanguageConversionPage />,
+    },
+    {
+      path: '/duplicates',
+      element: <DuplicatesPage />,
     },
   ],
   {
